@@ -1,0 +1,227 @@
+---
+title: "Zooming in on 2019 Performace"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+The key areas recommended to be looked at in this test are the following:
+
+1) Using data collected in Ghana at the end of Y2019 cropping season, calculate summary metrics that can inform our Research Team about product performance. 
+2) Present this information in a synthetic and visual manner (you might be asked to go over some of these findings orally during our final interview) 
+Some sample questions that are of particular interest: 
+1. Do crop yields (in kg/acre) vary significantly from region to region, from district to district, from farmer to farmer? What seems to be a normal, vs. low, vs. high yield for maize in Ghana? 
+2. Do other factors seem to influence crop yields, such as a farmer’s gender, literacy, phone ownership, farm size, use of fertilizer, proximity to a larger town, etc.? 
+3. Out of the survey sample (cryield table), what is the proportion of farmers who reported bad/good crop yields and received (or did not receive) an insurance payout? 
+4. At the district level, can we say that districts with poorer (or better) harvests received higher (or lower) insurance payout amounts? 
+5. Can we trust the quality of our Y2019 sampled data? 
+
+We first have to install and load the libraries that we are going to need for this analysis.
+```{r, echo=FALSE}
+if (!require("tidyverse")) install.packages("tidyverse")
+library("tidyverse")
+```
+
+Next step is to read all the data into R using the read_csv function from the read_r package.
+```{r, include=FALSE, echo=FALSE}
+cryield = read_csv("data/cryield")
+contracts = read_csv("data/contracts")
+customers = read_csv("data/customers")
+locations = read_csv("data/locations")
+```
+
+
+We then merge the data into one big dataset that so that we can start to explore the data. We discover this relationships by looking at the variables that are shared across the tables.
+
+The resulting table has the following features.
+```{r, echo= FALSE}
+surveydata = cryield %>% left_join(customers, by="cust_id") %>% 
+  left_join(contracts, by="cntr_id") %>% 
+  left_join(locations, by="loc_id")
+str(surveydata)
+```
+
+The readme file shared additional information on the weight of bags of different products that we can now use to standardize the measurements of the harvests.
+```{r, echo=FALSE}
+surveydata$product_code %>% unique()
+```
+Below is a computation of the kg values of the bags harvested. This should assist in calculating the yield per hactare.
+```{r, echo=FALSE}
+surveyyieldskgs = surveydata %>% mutate(
+  yield_kgs = case_when(
+    product_code == "MAIZ-GHA-20-ST01" ~ yield_bags *100,
+    product_code == "RICE-GHA-20-ST01" ~ yield_bags* 100,
+    product_code == "GROU-GHA-20-ST01" ~ yield_bags*82,
+    product_code=="SORG-GHA-20-ST01" ~ yield_bags *100
+  ),
+  kg_acres = yield_kgs/planted_acres
+)
+surveysample = surveyyieldskgs %>% select(product_code, yield_bags, yield_kgs, planted_acres,kg_acres)
+surveysample %>% tail(10)
+```
+
+### Let's Explore
+
+```{r, echo=FALSE, warning=FALSE}
+surveyyieldskgs %>% ggplot(aes(x=reg_nm, y=kg_acres)) + 
+  geom_point(stat="identity", bins=100, fill ="#e7be38", color="#779c2c")+
+  ggthemes::theme_economist()+ geom_boxplot(fill="#779c2c")+
+  xlab("regions")+ylab("Yields (Kg/Acres")+
+  ggtitle("The distribution of yields in different regions")
+```
+```{r, echo=FALSE}
+surveysubset = surveyyieldskgs %>%
+  mutate(region=factor(reg_nm), district=factor(dist_nm)) %>%
+  select(region, district, cust_id.x, kg_acres) %>%
+  filter(cust_id.x %in% cryield$cust_id)
+surveysubset %>% head()
+```
+
+The harvests (in yields/kg) shows that GH-AH and GH-UW are the best which GH-UW having  a better harvest distribution as shown by the boxplot above. Additionally, GH-NP seems to have the greatest number of outliers.
+GH-UE has the worst harvest of all the other regions that were surveyed.
+
+```{r, echo=FALSE, warning=FALSE}
+surveyyieldskgs = surveyyieldskgs %>%
+  mutate(bare_farm = farm_size - planted_acres)
+
+
+surveyyieldskgs %>% ggplot(aes(x=reg_nm, y=bare_farm)) + 
+  geom_point(stat="identity", bins=100, fill ="#e7be38", color="#779c2c")+
+  ggthemes::theme_economist()+ geom_boxplot(fill="#779c2c")+
+  xlab("regions")+ylab("Size of Unplated ares in Acres")+
+  ggtitle("The distribution of Unplanted areas in different regions")
+```
+
+GH-NP is the only regions where some farmers did not plant on the full farm with the median farm size left unplanted being 7 Acres. Additionally, there are is a farmer who underreported their farm size. This could be a case of data intergrity issues and is worthy of a closer look to determine the scale across WC database.
+
+
+```{r, fig.width=12, echo=FALSE, warning=FALSE}
+surveyyieldskgs %>% 
+  mutate(fert_acre = fert_bags/planted_acres) %>%
+  ggplot(aes(x=fert_acre*50, y=kg_acres)) + facet_grid(cols=vars(product_code))+
+  geom_point(stat="identity", fill ="#e7be38", color="#779c2c") + 
+  geom_smooth()+ xlab("The bags of fertiliser used per Acre")+
+  ylab("The bags of maize harvested per acre") + coord_fixed(ratio=1,xlim=c(0,1000), ylim=c(0,1000))+
+  ggthemes::theme_economist()+ theme(plot.title = element_text(size=12))+
+  ggtitle("The relationship between the bags of fertliser used and the harvested product")
+```
+
+Fertiliser use (assuming 50kg is the standard bag of fertiliser) seems to influence the harvest proportion with the maximum rate being about 200kgs/acre.  Of all the crops, Sorghum seems to respond the best to fertiliser application.
+
+```{r, echo=FALSE, warning=FALSE}
+surveyyieldskgs %>% mutate(
+  yield_consumed = case_when(
+    product_code == "MAIZ-GHA-20-ST01" ~ (yield_bags-sold_bags) *100,
+    product_code == "RICE-GHA-20-ST01" ~ (yield_bags -sold_bags)* 100,
+    product_code == "GROU-GHA-20-ST01" ~ (yield_bags - sold_bags)*82,
+    product_code=="SORG-GHA-20-ST01" ~ (yield_bags - sold_bags) *100
+  )
+) %>%
+  ggplot(aes(x=reg_nm, y=yield_consumed))+
+  geom_point(stat = "identity",fill ="#e7be38", color="#779c2c")+geom_boxplot(fill="#779c2c")+
+  xlab("region name")+ ylab("Yields in KGs that might be consumed") + 
+  ggtitle("The number of KGs that the farmers left for consumption")
+```
+
+in GH-BA and GH-NP there are some farmers who seem to have misrepresented their harvest data. Investigation should reveal whether this deserves more attention or not.
+
+Now that we have a better understanding of the harvest performace we can start to look at answering the questions posed.
+
+### 1. Do crop yields (in kg/acre) vary significantly from region to region, from district to district, from farmer to farmer? What seems to be a normal, vs. low, vs. high yield for maize in Ghana? 
+
+#### Region to Region
+```{r, echo=FALSE}
+yield_region = lm(kg_acres ~ region, data = surveysubset)
+summary(yield_region)
+```
+We look at the There's some evidence of varying yields in all regions except GH-UW and across regions with a p-value of 0.02 we can assume variation of yields across regions. Our F-score at 2.7 confirms this as shown below.
+```{r, echo=FALSE}
+anova(yield_region)
+```
+
+The anova test confirms this significant variation between groups in different regions.
+#### District to District
+```{r, echo=FALSE}
+yield_district = lm(kg_acres ~ district, data = surveysubset)
+summary(yield_district)
+anova(yield_district)
+```
+There's little to no evidence in this data that confirm variation between the yields from one district to another. This is because we have an F-score less than 1 and a p-value greater than 0.05
+#### Customer to Customer
+```{r, echo=FALSE}
+yield_customer = lm(kg_acres ~ cust_id.x, data = surveysubset)
+summary(yield_customer)
+anova(yield_customer)
+```
+
+There's no evidence of variation of yields from customer to customer that can be confirmed with this survey.
+#### Normal vs High Yield vs Low Yield
+```{r, echo=FALSE}
+ghanamodel <- aov(kg_acres ~ region , data =surveysubset)
+posthoc <- TukeyHSD(x=ghanamodel, 'region', conf.level=0.95)
+posthoc
+```
+
+### 2. Do other factors seem to influence crop yields, such as a farmer’s gender, literacy, phone ownership, farm size, use of fertilizer, proximity to a larger town, etc.? 
+
+```{r, echo=FALSE}
+yieldfactors = surveyyieldskgs %>%
+  select(cust_id.x, fert_bags, #date_reg.x, 
+         gender, literacy, farm_size, num_parcels, #cht_phone,
+         cht_season,cht_channel, season, type, #date_planted, date_planted_in, 
+         loc_id, has_mobile_money,
+         reg_nm, dist_id, kg_acres) %>%
+  replace_na(list(fert_bags=0, kg_acres=0, literacy="none", farm_size=0, num_parcels=0))%>%
+  mutate(gender=as.factor(gender),
+         literacy = as.factor(literacy),
+         # cht_phone = as.factor(cht_phone),
+         cht_season = as.factor(cht_season),
+         cht_channel = as.factor(cht_channel),
+         type = as.factor(type),
+         season = as.factor(season),
+         reg_nm = as.factor(reg_nm),
+         has_mobile_money = as.factor(has_mobile_money)
+         ) 
+yieldreg = lm(kg_acres ~ . ,data= yieldfactors)
+summary(yieldreg)
+```
+The linear regression model above shoes that fertiliser bags and type have the most significance to the yields per kgs. Other factors have very low influence if any at all.
+
+### 3. Out of the survey sample (cryield table), what is the proportion of farmers who reported bad/good crop yields and received (or did not receive) an insurance payout? 
+```{r, echo=FALSE}
+payouts <- surveyyieldskgs %>%
+  mutate(max_yield_kgs = yield_max_bags * case_when(
+    product_code == "MAIZ-GHA-20-ST01" ~ yield_bags *100,
+    product_code == "RICE-GHA-20-ST01" ~ yield_bags* 100,
+    product_code == "GROU-GHA-20-ST01" ~ yield_bags*82,
+    product_code=="SORG-GHA-20-ST01" ~ yield_bags *100
+  )) %>%
+  select(cust_id.x, yield_kgs, max_yield_kgs, payout_usd) %>%
+  mutate(yield_shortfall = max_yield_kgs - yield_kgs)
+payoutsselect = payouts %>% select(cust_id.x, yield_kgs, payout_usd) %>% 
+  replace_na(list(yield_kgs=0, payout_usd=0))
+chisq.test(payoutsselect)
+# chisq.test(payoutsselect, simulate.p.value = TRUE)     #only run this to acoid the test reliant on the distribution of the test statistic . it takes a little bit of time
+```
+
+We can thus see an apparent association between crop yields and payouts. The test results show that relying on the distribution of the test statistic might lead to some inaccuracies so i have included the code that removes this reliance. It takes a little bit of time to run. 
+
+### 4. At the district level, can we say that districts with poorer (or better) harvests received higher (or lower) insurance payout amounts?
+```{r, echo=FALSE}
+districtpayouts <- surveyyieldskgs %>%
+  select(dist_id, yield_kgs, payout_usd) %>%
+  replace_na(list(yield_kgs=0, payout_usd=0))
+chisq.test(districtpayouts)
+# chisq.test(districtpayouts, simulate.p.value = TRUE) #only run this to acoid the test reliant on the distribution of the test statistic . it takes a little bit of time
+```
+The payouts across districts seem to have a correlation to the yields.
+
+### 5. Can we trust the quality of our Y2019 sampled data?
+```{r, echo=FALSE}
+t.test(cryield$planted_acres, customers$farm_size, var.equal = TRUE)
+```
+As we have a p-value that's less than 0.05 we can estimate that the survey is a proper representation of the population.
+
+```{r}
+sessionInfo()
+```
+
