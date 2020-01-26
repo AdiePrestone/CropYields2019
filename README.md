@@ -2,7 +2,12 @@
 
 This repository analyses the Crop Yield results in Ghana 2019. This data is owned by [World Cover](https://www.worldcovr.com/) whose permission will have to be sought before use.
 
-Here are the details of the session that was used
+The presentation file is [harvest2019.pdf](https://github.com/AdiePrestone/CropYields2019/blob/master/harvest2019.pdf).
+
+All the code used and explanations can be found in [harvest2019.Rmd](https://github.com/AdiePrestone/CropYields2019/blob/master/harvest2019.Rmd).
+
+
+Here are the session information used
 ```
 R version 3.5.3 (2019-03-11)
 Platform: x86_64-pc-linux-gnu (64-bit)
