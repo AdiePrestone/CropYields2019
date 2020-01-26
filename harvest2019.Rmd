@@ -30,7 +30,7 @@ locations = read_csv("data/locations")
 ```
 
 
-We then merge the data into one big dataset that so that we can start to explore the data. We discover this relationships by looking at the variables that are shared across the tables.
+We then merge the data into one big dataset so that we can start to explore the data. We discover this relationships by looking at the variables that are shared across the tables.
 
 The resulting table has the following features.
 ```{r, echo= FALSE}
@@ -76,7 +76,7 @@ surveysubset = surveyyieldskgs %>%
 surveysubset %>% head()
 ```
 
-The harvests (in yields/kg) shows that GH-AH and GH-UW are the best which GH-UW having  a better harvest distribution as shown by the boxplot above. Additionally, GH-NP seems to have the greatest number of outliers.
+The harvests (in yields/kg) shows that GH-AH and GH-UW are the best with GH-UW having  a better harvest distribution as shown by the boxplot above. Additionally, GH-NP seems to have the greatest number of outliers.
 GH-UE has the worst harvest of all the other regions that were surveyed.
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -91,7 +91,7 @@ surveyyieldskgs %>% ggplot(aes(x=reg_nm, y=bare_farm)) +
   ggtitle("The distribution of Unplanted areas in different regions")
 ```
 
-GH-NP is the only regions where some farmers did not plant on the full farm with the median farm size left unplanted being 7 Acres. Additionally, there are is a farmer who underreported their farm size. This could be a case of data intergrity issues and is worthy of a closer look to determine the scale across WC database.
+GH-NP is the only region where some farmers did not plant on the full farm with the median farm size left unplanted being 7 Acres. Additionally, there are is a farmer who underreported their farm size. This could be a case of data intergrity and is worthy of a closer look to determine the scale across WC database.
 
 
 ```{r, fig.width=12, echo=FALSE, warning=FALSE}
@@ -122,7 +122,7 @@ surveyyieldskgs %>% mutate(
   ggtitle("The number of KGs that the farmers left for consumption")
 ```
 
-in GH-BA and GH-NP there are some farmers who seem to have misrepresented their harvest data. Investigation should reveal whether this deserves more attention or not.
+In GH-BA and GH-NP there are some farmers who seem to have misrepresented their harvest data. Investigation should reveal whether this deserves more attention or not.
 
 Now that we have a better understanding of the harvest performace we can start to look at answering the questions posed.
 
@@ -133,12 +133,13 @@ Now that we have a better understanding of the harvest performace we can start t
 yield_region = lm(kg_acres ~ region, data = surveysubset)
 summary(yield_region)
 ```
-We look at the There's some evidence of varying yields in all regions except GH-UW and across regions with a p-value of 0.02 we can assume variation of yields across regions. Our F-score at 2.7 confirms this as shown below.
+There's some evidence of varying yields in all regions except GH-UW and across regions with a p-value of 0.02 we can assume variation of yields across regions. Our F-score at 2.7 confirms this as shown below.
 ```{r, echo=FALSE}
 anova(yield_region)
 ```
 
 The anova test confirms this significant variation between groups in different regions.
+
 #### District to District
 ```{r, echo=FALSE}
 yield_district = lm(kg_acres ~ district, data = surveysubset)
@@ -146,6 +147,7 @@ summary(yield_district)
 anova(yield_district)
 ```
 There's little to no evidence in this data that confirm variation between the yields from one district to another. This is because we have an F-score less than 1 and a p-value greater than 0.05
+
 #### Customer to Customer
 ```{r, echo=FALSE}
 yield_customer = lm(kg_acres ~ cust_id.x, data = surveysubset)
@@ -154,6 +156,7 @@ anova(yield_customer)
 ```
 
 There's no evidence of variation of yields from customer to customer that can be confirmed with this survey.
+
 #### Normal vs High Yield vs Low Yield
 ```{r, echo=FALSE}
 ghanamodel <- aov(kg_acres ~ region , data =surveysubset)
